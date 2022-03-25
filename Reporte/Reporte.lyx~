@@ -116,6 +116,19 @@ Emilio Tonix Gleason
 24/Marzo/2021
 \end_layout
 
+\begin_layout Standard
+\begin_inset CommandInset toc
+LatexCommand tableofcontents
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\end_layout
+
 \begin_layout Section
 Generación de la señal en python con compresion 
 \end_layout
@@ -257,7 +270,7 @@ tor.py}
 
 \begin_layout Standard
 Posteriormente la matriz la regresamos a su estado vector fila y converitrmos
- los valores a enteros para que puedan ser usado en el microprocesador.
+ los valores a enteros para que puedan ser usado en el FPGA.
  
 \end_layout
 
@@ -1018,6 +1031,638 @@ status open
 
 \backslash
 lstinputlisting[language=Verilog, firstline=56, lastline=64]{../DDS/DDS.v}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+newpage
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Implementación 
+\end_layout
+
+\begin_layout Standard
+El modelo de alto nivel tiene que poder recibir los datos del preprocesamiento
+ para guardarlos en la memoria RAM y posteriormente elegir una fase, para
+ comenzar la generación de la señal seno.
+ Para la escritura de la memoria se encpasulo el modelo de RAM en el modelo
+ final con el objetivo de hacer transparente el proceso.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement H
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename BloqueAltoNivel.jpg
+	lyxscale 20
+	scale 10
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Diagrama de bloque DDS
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Internamente cuenta con tres modulos.
+ Prescaler configurable para el manejo de frecuencia, memoria RAM para almacenar
+ datos y una maquina de estados para las etapas de lectura.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement H
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename stateMachines.jpg
+	lyxscale 10
+	scale 10
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Maquinas de estados para lectura RAM
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+En la imagen debajo se puede apreciar el cambio de maquina de estados por
+ parte de la señal 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement H
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename reconstrucción.png
+	scale 60
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Cambio de maquina de estados por sección de la señal.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Escritura de la memoria 
+\end_layout
+
+\begin_layout Standard
+Mientras el proceso de escritura este habilitado por medio de 
+\begin_inset Quotes eld
+\end_inset
+
+
+\series bold
+WE
+\series default
+
+\begin_inset Quotes erd
+\end_inset
+
+ estara deshabilitado la parte de lectura de memoria y de generación de
+ la señal.
+ Para simular la escritura de la memoria se usaran las APIS 
+\series bold
+fopen
+\series default
+ y 
+\series bold
+fscan
+\series default
+ durante el proceso de simulación.
+ De esta forma se lee el archivo de texto generado en python.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Verilog, firstline=46, lastline=61]{../test/MemoryRead_tb.
+v}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement H
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename pasted1.png
+	scale 70
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename LastaDataValues.png
+	scale 70
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Lecturas de los valores
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+newpage
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Setup de fase
+\end_layout
+
+\begin_layout Standard
+Para la colacion de la fase se hace la conversion de grado 
+\begin_inset Formula $\theta$
+\end_inset
+
+ a 
+\begin_inset Formula $\phi$
+\end_inset
+
+ como se discutio en la sección 2.1, posteriormente se manda un valor donde
+ se selecionara la posicion de la maquina de estados inicial, y finalmente
+ se hace la lectura de la memoria hasta n puntos de fase.
+ Cuando la fase 
+\begin_inset Formula $\phi$
+\end_inset
+
+ llega a 0 se hace visible la señal empezando asi la señal en su punto de
+ fase.
+ 
+\end_layout
+
+\begin_layout Standard
+En la parte del test bench se puede colocar una fase con valor numerico.
+ Notese que tiene que estar deshabilitada la escritura de memoria.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Verilog, firstline=62, lastline=69]{../test/MemoryRead_tb.
+v}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement H
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename Phase.png
+	lyxscale 70
+	scale 60
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Fase de 45 gados
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align center
+
+\series bold
+mem_addres
+\series default
+ : Indice en la memoria.
+ 
+\end_layout
+
+\begin_layout Standard
+\align center
+
+\series bold
+mem_dir
+\series default
+ : Forward{1},Backward{-1}
+\end_layout
+
+\begin_layout Standard
+\align center
+
+\series bold
+data_pol
+\series default
+: Data polarizaqtion [1,-1]
+\end_layout
+
+\begin_layout Standard
+\align center
+
+\series bold
+huffman
+\series default
+ : Es el numero en el que se repite el valor logico de la señal.
+ En hardware puede ser tomado con un delay con N ciclos muestra.
+ 
+\end_layout
+
+\begin_layout Standard
+\align center
+
+\series bold
+tic_tac
+\series default
+: Es el tiempo de enable para la ejecución de la señal
+\end_layout
+
+\begin_layout Standard
+A continuación se mostrata un diagrama visual de como funciona la logica
+ del seteo de la fase, manejando tres hilos de tiempo como procesos concurrentes
+ y los relojes como los estimulos a los que responde el cambio.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement H
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename ProcessDiagram.jpg
+	lyxscale 30
+	scale 30
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Diagrama de procesamiento de fase y lectura de memoria
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Setup de frecuencia
+\end_layout
+
+\begin_layout Standard
+Para la modulación en frecuencia se hizo un prescaler que pueda hacer el
+ cambio en runtime, para mejor y evitar problemas de cuentas cuando se hace
+ el cambio de frecuencia el contador interno del prescaler se hace 0 .
+ Por defecto el prescaler tiene una frecuencia de 5 Mhz.
+ El cambio de la frecuencia se hace atravez de la señal 
+\begin_inset Quotes eld
+\end_inset
+
+
+\series bold
+set_div
+\series default
+
+\begin_inset Quotes erd
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Verilog, firstline=28, lastline=31]{../Prescaler/Prescale
+r.v}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+El define nos deja convertir frecuencia esperada a cuentas.
+ Se muestra aqui como se genera el define en config.v
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Verilog, firstline=1, lastline=6]{../config.v}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Para la prueba de modulación de frecuencia aplico la funcion chirp lineal.
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $sin(\phi(t))$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Con un paso c y una frecuencia inicial 
+\begin_inset Formula $f_{0}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $\phi(t)=ct+f_{0}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+En nuestro caso se hara 
+\begin_inset Formula $c=100$
+\end_inset
+
+ , 
+\begin_inset Formula $f_{0}=500$
+\end_inset
+
+ y como limite de 
+\begin_inset Formula $\phi(t)_{max}=6500$
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Standard
+Dado que el reloj esta a 50MHZ se hace la division del reloj con 
+\begin_inset Formula $\phi(t)$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $delay=\frac{clk_{src}}{\phi(t)}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Aqui se presenta la representación codificada de dicho proceso de generación
+ chirp.
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Verilog, firstline=71, lastline=80]{../test/MemoryRead_tb.
+v}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement H
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename chirp.png
+	scale 60
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Chirp test bench
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
 \end_layout
 
 \end_inset
