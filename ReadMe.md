@@ -16,7 +16,7 @@ DDS is a  way to generate sine wave in embbeded systems. The main idea is to sav
 4. Read memory Backward negative polarization
 
 # Article in spanish
-Available ariticle in spanish for more details an hardware architecture. 
+Available ariticle in spanish for more details and hardware architecture. 
 
 # Results 
 In this project it is proposed to use SVD and huffan coding to reduce memory foot print on sin wave generation. 
