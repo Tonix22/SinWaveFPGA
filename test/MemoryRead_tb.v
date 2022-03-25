@@ -75,9 +75,9 @@ initial begin
         freq = i; //1khz
         #4;
         set_freq = 0;
-        #(`MHZ(100)/i);
+        #(`MHZ(100)/i); // delay
     end
-
+    
     $stop; 
 end
 
