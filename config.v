@@ -3,7 +3,7 @@
 
 //CLOCKS
 `define SOURCE_CLK `MHZ(50)
-`define Output_frequency `MHZ(25)//Hz 125 ms
+`define Output_frequency `MHZ(5)
 
 //MEMORY
 `define DATA_LEN 11
