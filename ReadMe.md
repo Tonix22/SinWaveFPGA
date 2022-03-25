@@ -4,7 +4,7 @@
 This project implement a DDS **digital direct synthesis** in a CYCLONE V FPGA with Quartus enviorment.
 The advantage of this project is that it reduces memory footprint in RAM usage.
 
-This project uses a SVD and huffman compression without reduce as little as possible resolution. The generation of sin wave is avalibable in the PythonScript folder, and values are avaiblable in ouput.txt or Compressed_sin.txt. This files are free to use for any project. However this could be not enought and we try to reduce memory footprint due to RAM memory is quite expensive for FPGA projects or embeded systems.
+This project uses a SVD and huffman compression without reduce as little as possible resolution due to RAM memory is quite expensive for FPGA projects or embeded systems. The generation of sin wave is avalibable in the PythonScript folder and wave values are avaiblable in ouput.txt or Compressed_sin.txt. This files are free to use for any embbedded project. 
 
 # How to DDS
 
@@ -34,9 +34,7 @@ In this project it is proposed to use SVD and huffan coding to reduce memory foo
 32.82%
 
 ### USUALLY SIN WAVE
-
-![text](Reporte/PythonGenerated.png){ width=30%,height:30px}
+<img src="Reporte/PythonGenerated.png" alt="alt text" title="image Title" height="300"/>
 
 ### SVD SIN WAVE
-
-![text](Reporte/SVDcompressed.png){ width=30%,height:30px}
+<img src="Reporte/SVDcompressed.png" alt="alt text" title="image Title" height="300"/>
