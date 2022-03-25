@@ -126,7 +126,7 @@ always @(posedge src_clk) begin
     end
     else if(!we)
         // set_phase pulse is over and decrement phase_indx until zero
-        // once conter is 0 enable wave output.
+        // once counter is 0 enable wave output.
         if(tic_tac) //stay sync with memory manager
         begin
             fts = 1'b0;

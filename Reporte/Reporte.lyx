@@ -1,0 +1,1029 @@
+#LyX 2.2 created this file. For more info see http://www.lyx.org/
+\lyxformat 508
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\begin_preamble
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+\end_preamble
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry true
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\leftmargin 1.5cm
+\rightmargin 1.5cm
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+DDS con señal comprimida por medio de SVD y huffman coding para la integración
+ en un FPGA 
+\end_layout
+
+\begin_layout Author
+Emilio Tonix Gleason 
+\end_layout
+
+\begin_layout Date
+24/Marzo/2021
+\end_layout
+
+\begin_layout Section
+Generación de la señal en python con compresion 
+\end_layout
+
+\begin_layout Standard
+Para la generación de la señal se uso un script de python atravez de la
+ libreria numpy.
+ Se asignaron 256 espacios para generar una cuarta parte, dado que la señal
+ se puede reconstruir en 4 estapas con un solo conetido en memoria, mas
+ adelante se mostrara el planteamento de esto.
+ La señal por defecto viene ya normalizada de -1 a 1, sin embargo le hacemos
+ un offset y compresion para que quede del rago [.5,1].
+\end_layout
+
+\begin_layout Standard
+\noindent
+La idea de esto es dejar la parte negativa del seno con valores positivos,
+ finalmente la señal entonces quedaria de [0,1].
+ Finalmente se multiplica ese valor normalizado por 255.
+ La señal queda de [0,255] con el zero en 127.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Python, firstline=1, lastline=8]{../PythonScript/Generato
+r.py}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement H
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename PythonGenerated.png
+	lyxscale 50
+	scale 60
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Cuarto de la señal zero en un rango [127,255]
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+newpage
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Compresion de la señal para ahorro de memoria
+\end_layout
+
+\begin_layout Standard
+Dado que la memoria es un recurso critico y se buscaran estrategias mas
+ elegantes para su compresion y reconstrucción.
+ Notese que para representar la señal estamos usando solo 7 bits [0,127].
+ Por lo cual el espacio total esta dado por 
+\begin_inset Formula $255\times7bits=1785$
+\end_inset
+
+.
+ Para mejorar el espacio requerido usaremos dos preprocesamientos el primero
+ es SVD y el segundo es compression de huffman.
+ 
+\end_layout
+
+\begin_layout Standard
+La descomposición de valores singulares (SVD) consiste en obtener las caracteris
+ticas mas signficativas de una matriz con eso logramos la compresion dado
+ que podemos remover los valores que no aporten tanto a lo que conocemos
+ como la forma de una senosodial, y tratar de dejar lo minimo necesario
+ para obtener su forma.
+ Para ejecutar la compresion SVD convertirmos la señal en un matriz cuyas
+ dimensiones sean un par de 256.
+ La matriz elegida fue de 64X4=256.
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Python, firstline=11, lastline=18]{../PythonScript/Genera
+tor.py}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Posteriormente la matriz la regresamos a su estado vector fila y converitrmos
+ los valores a enteros para que puedan ser usado en el microprocesador.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Python, firstline=20, lastline=21]{../PythonScript/Genera
+tor.py}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement H
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename SVDcompressed.png
+	lyxscale 50
+	scale 60
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Señal con extración de caracteristicas SVD
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+La señal nos da una sensación aparante de tener mas risos sin embargo esto
+ se debe a que se aplana mas y repite valores dado que se le removio su
+ suavidad.
+ Por esta razon vamos explotar la codificacion de huffman, la cual consiste
+ en almacenar el valor junto con su número de repeticiones.
+ En python es muy sencillo usamos la funcion unique que nos dice los valores
+ que existen ya con el numero de repeticiones.
+ Y dado que esta parte de la señal es monotonicamente creciente podemos
+ usar la compresión sin problema.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Python, firstline=30, lastline=32]{../PythonScript/Genera
+tor.py}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float table
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="2" columns="10">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Value
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+4 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+6 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+7 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+9
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+10
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+12
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Times
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+2 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+2 
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+2
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+2
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Una muestra del resultado de compresión
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Notese que la tabla omite valores como por ejemplo el 2,5,8,11, y esto es
+ por que la SVD removio estas caracteristicas menos relevantes.
+\end_layout
+
+\begin_layout Standard
+Finalmente el tamaño de la tabla nos queda de tamaño 109.
+ Para los datos seguimos requieriendo 7 bits, sin embargo hay que agregar
+ 4 bits de repticiones de los datos.
+ Se aplica enmascaramiento para generar el dato y se guarda en un archivo
+ de texto.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Python, firstline=35, lastline=38]{../PythonScript/Genera
+tor.py}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Comparativa de ahorro
+\end_layout
+
+\begin_layout Standard
+Espacio convencional
+\end_layout
+
+\begin_layout Standard
+\noindent
+\align center
+\begin_inset Formula $255\times7bits=1785$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+Espacio con SVD y huffman
+\end_layout
+
+\begin_layout Standard
+\noindent
+\align center
+\begin_inset Formula $109\times(7bits+4(huffman))=1199$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+Compresión
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $compress=1-\frac{1199}{1785}=32.82\%$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Etapas de fase
+\end_layout
+
+\begin_layout Standard
+La señal decomprimida consta de 256 valores por etapa y dado que se requieren
+ 4 etapas para reconstruir el seno tenemos un total de 1024 puntos por cada
+ periodo de la señal, estos puntos son la representación de la fase la cual
+ denotamos con el siguiente simbolo.
+ 
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $\phi$
+\end_inset
+
+ = fase en el rango discreto
+\end_layout
+
+\begin_layout Standard
+\noindent
+\align left
+Cada etapa tiene una lectura de un pedaso de la señal, y tiene un offset
+ de 127.
+ Los [] respresentan el indice de fase 
+\begin_inset Formula $\phi$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Enumerate
+Lectura de memoria Forward 
+\begin_inset Formula $\{0\leq\phi\leq255\}$
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Enumerate
+Lectura de memoria Backward 
+\begin_inset Formula $\{256\leq\phi\leq511\}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Enumerate
+Lectura de memoria Forward con polarización negativa 
+\begin_inset Formula $\{512\leq\phi\leq767\}$
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Enumerate
+Lectura de memoria Backward con polarización negativa 
+\begin_inset Formula $\{768\leq\phi\leq1023\}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Dichos etapas estaran representadas por una maquina de estados.
+ 
+\end_layout
+
+\begin_layout Subsection
+Ecuaciones de fase
+\end_layout
+
+\begin_layout Standard
+Se requiere hacer un mapeo de grados 
+\begin_inset Formula $0\le\theta\leq360$
+\end_inset
+
+ 
+\begin_inset Formula $\rightarrow$
+\end_inset
+
+ 
+\begin_inset Formula $\{0\leq\phi\leq1024\}$
+\end_inset
+
+ a fase discreta.
+ Para ello hacemos una simple división.
+ 
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $\alpha=\frac{1024}{360}=2.844\frac{val}{grad}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+\align left
+Calculamos el error de la siguiente forma redondeando
+\begin_inset Formula $\alpha=3$
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $Err=\frac{1}{3-2.844}=6.41$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+Si redondeamos 
+\begin_inset Formula $\alpha$
+\end_inset
+
+ , el error incrementa por un valor cada 6.41 valores de 
+\begin_inset Formula $\theta$
+\end_inset
+
+ .
+ Asique cada 6 incrementos de 
+\begin_inset Formula $\theta$
+\end_inset
+
+ restamos la sobresitmación.
+ Y como factor de correción cada 90 grados sumamos uno.
+ Con esto tenemos mas presición, en la ecuación inferior se considera que
+ 
+\begin_inset Formula $\phi,\theta\in\mathbb{N}$
+\end_inset
+
+ dado que la ecuación se encuentra en el FPGA sin valores flotantes, por
+ esto mismo la ecuacion se factoriza.
+ 
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $\phi=\alpha\theta-\frac{\theta}{6}+\frac{\theta}{90}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $\phi=3*\theta-\frac{\theta}{6}+\frac{\theta}{90}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Codigo de verilog en la parte de localización de fase.
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Verilog, firstline=98, lastline=99]{../DDS/DDS.v}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Algoritmo de fase
+\end_layout
+
+\begin_layout Enumerate
+Mandar una señal de habilitación [trigger] para habilitar la maquina de
+ estados de la fase y colocar la dirección de lectura de memoria en un valor
+ conocido.
+ 
+\end_layout
+
+\begin_layout Enumerate
+Buscar a que rango de la etapa de reconstrucción pertenece el valor de fase.
+ 
+\end_layout
+
+\begin_deeper
+\begin_layout Enumerate
+Por ejemplo 
+\begin_inset Formula $\phi=300$
+\end_inset
+
+ pertenece a la segunda etapa.
+ 
+\end_layout
+
+\end_deeper
+\begin_layout Enumerate
+Selecionar la maquina de estados en la etapa correspondiente.
+\end_layout
+
+\begin_layout Enumerate
+Restar a 
+\begin_inset Formula $\phi$
+\end_inset
+
+ un offset, segun la etapa en la que se inicie.
+ 
+\end_layout
+
+\begin_deeper
+\begin_layout Enumerate
+Si se elige la estapa 2 el offset sería 256 .
+ 
+\begin_inset Formula $\{\phi-256\}$
+\end_inset
+
+ 
+\end_layout
+
+\end_deeper
+\begin_layout Enumerate
+Restar 
+\begin_inset Formula $\phi=\phi-1$
+\end_inset
+
+ cada tiempo 
+\begin_inset Formula $t_{\phi}$
+\end_inset
+
+ , este tiempo esta en sincronia con el proceso de lectura de memoria.
+ Sin embargo la visibilidad de la señal esta deshabilitada.
+\end_layout
+
+\begin_layout Enumerate
+Una vez sea 
+\begin_inset Formula $\phi=0$
+\end_inset
+
+ se habilita la visibilidad de la señal.
+ La señal sera mostrada en el punto de fase requerido dado que el proceso
+ de lectura de memoria ya estaba corriendo concurremente.
+ 
+\end_layout
+
+\begin_layout Subsection
+Frecuencia de la señal
+\end_layout
+
+\begin_layout Standard
+La frecuencia de la señal seno esta da por el tiempo de lectura, lo cual
+ implica que si leemos la memoria en un intervalo 
+\begin_inset Formula $T_{div}$
+\end_inset
+
+ tendremos una relación que nos dara la frecuencia de salida de la señal.
+ 
+\end_layout
+
+\begin_layout Standard
+\noindent
+Un cuarto de la señal seno esta compuesta por 256 puntos.
+ Sin embargo con la tabla de huffman se comprime a 108 espacios de memoria.
+ El total de espacios en tiempo seran 256 tiempo de bit mas 108 lecturas
+ de memoria.
+ 
+\end_layout
+
+\begin_layout Standard
+\noindent
+Lecturas en memoria 
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $256+108=364$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+Cada lectura se hace por un tiempo del prescaler
+\end_layout
+
+\begin_layout Standard
+\noindent
+\align center
+\begin_inset Formula $T_{sin}=364*T_{div}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+Ahora lo rescribimos en terminos de frecuencia y lo multiplcamos por 4 partes.
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $T_{sin}=\frac{364}{f_{div}}*4$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $f_{sin}=\frac{f_{div}}{364*4}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $f_{sin}=\frac{f_{div}}{1456}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+Generalemente tenemos como entrada la frecuencia deseada para que el modulo
+ genera la señal.
+ Entonces ajustamos la frequencia del divisior como una parametro configurable
+ desde prescaler que nos permita hacer modicaciones de la frecuencia.
+ 
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Formula $f_{div}=f_{sin}\times1456$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+lstinputlisting[language=Verilog, firstline=56, lastline=64]{../DDS/DDS.v}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_body
+\end_document
