@@ -12,27 +12,31 @@ module FSM
     input trigger,
     input [1:0]state_sel,
 	output reg memdir,
+    output reg [(`ROWS_BASE_2-1):0] addr_rd,
 	output reg data_pol
 );
     // State variables
-    parameter FORWARD = 0,BACKWARD = 1;
-    parameter POL_POS = 0,POL_NEG  = 1;
+    parameter FORWARD = 1'b0,BACKWARD = 1'b1;
+    parameter POL_POS = 1'b0,POL_NEG  = 1'b1;
 
 	// Declare state register
 	reg		[1:0]state;
     reg     next;
 	 
 	 // Declare states
-	parameter S0 = 0, S1 = 1, S2 = 2, S3 = 3;
+	parameter S0 = 2'h0, S1 = 2'h1, S2 = 2'h2, S3 = 2'h3;
 
 
     always @(posedge src_clk) begin
         if(trigger)
             next = 1'b1;
+        else
+            next = 1'b0;
     end
-
+    
+  
 	// Determine the next state
-	always @ (posedge src_clk) 
+	always @ (posedge src_clk)
     begin
         if(!set_phase)
         begin 
@@ -70,31 +74,31 @@ module FSM
             begin
 				memdir   = FORWARD;
                 data_pol = POL_POS;
-                next = 1'b0;
+                addr_rd  = 7'b0;
             end
 			S1:
             begin
 				memdir   = BACKWARD;
                 data_pol = POL_POS;
-                next = 1'b0;
+                addr_rd  = `MEMORY_HEIGHT-1;
             end
 			S2:
             begin
 				memdir   = FORWARD;
                 data_pol = POL_NEG;
-                next = 1'b0;
+                addr_rd  = 7'b0;
             end
 			S3:
             begin
 				memdir   = BACKWARD;
                 data_pol = POL_NEG;
-                next = 1'b0;
+                addr_rd  = `MEMORY_HEIGHT-1;
             end
 			default:
             begin
 				memdir   = FORWARD;
-                data_pol = POL_NEG;
-                next = 1'b0;
+                data_pol = POL_POS;
+                addr_rd  = 7'b0;
             end
 		endcase
 	end

@@ -3,28 +3,31 @@
 module DDS(
     input src_clk,
     input set_phase,
-    input [9:0] phase,
-    input ena,
+    input [8:0] phase,
     input [(`DATA_LEN-1):0] data_wr,
     input [(`ROWS_BASE_2-1):0] addr_wr,
     input we,
-    output reg [6:0]sinwave
+    output reg [7:0]sinwave
 );
 
 //DDS USE
 reg wave_ena;
 initial wave_ena=1'b1;
 
-
 // Prescaler
 wire en_clk = 1'b1;
 wire wave_clk_en;
 
-Prescaler #(.DIV(1000)) wave_clk 
-(   .src_clk(src_clk),
-    .en(en_clk),
-    .clk_div(wave_clk_en)
-);
+//MEMORY
+wire [(`DATA_LEN-1):0]data_rd;
+
+wire [(`ROWS_BASE_2-1):0] read_dir; // use to get the module initial dir
+reg [(`ROWS_BASE_2-1):0] addr_rd;
+
+wire [(`ROWS_BASE_2-1):0] addr = we?addr_wr:addr_rd;
+reg read_mem;
+initial read_mem = 1'b0;
+
 
 //FSM
 reg trigger;
@@ -32,108 +35,174 @@ reg [1:0]state_sel;
 wire memdir;
 wire data_pol;
 
+
+// Declare states
+parameter S0 = 2'b00, S1 = 2'b01, S2 = 2'b10, S3 = 2'b11;
+// State variables
+parameter FORWARD = 1'b0,BACKWARD = 1'b1;
+parameter POL_POS = 1'b0,POL_NEG  = 1'b1;
+
+//PHASE
+reg [9:0] phase_indx;
+initial phase_indx = 10'd0;
+reg fts;
+
+/***************************************
+************ MODULES *****************
+***************************************/
+
+Prescaler #(.DIV(`MHZ(10))) wave_clk 
+(   .src_clk(src_clk),
+    .en(en_clk),
+    .clk_div(wave_clk_en)
+);
+
 FSM fsm
 (
     .src_clk(src_clk),
-    .set_phase(set_phase),
+    .set_phase(fts),
     .trigger(trigger),
     .state_sel(state_sel),
 	.memdir(memdir),
+    .addr_rd(read_dir),
 	.data_pol(data_pol)
 );
-// Declare states
-parameter S0 = 0, S1 = 1, S2 = 2, S3 = 3;
-// State variables
-parameter FORWARD = 0,BACKWARD = 1;
-parameter POL_POS = 0,POL_NEG  = 1;
-
-//PHASE
-always @(posedge src_clk) begin
-
-    if(set_phase && wave_ena==1'b1)begin
-        wave_ena = 1'b0;
-        if(phase < 255)
-            state_sel = S0;
-        else if (phase >= 256 && phase<512) 
-        begin
-            state_sel = S1;
-        end
-        else if (phase >= 512 && phase<768) 
-        begin
-            state_sel = S2;
-        end
-        else if (phase >= 768 && phase<1024) 
-        begin
-            state_sel = S3;
-        end
-    end
-end
-
-//MEMORY
-wire [`DATA_LEN:0]data_rd;
-reg  [(`ROWS_BASE_2-1):0] addr_rd;
-wire [(`ROWS_BASE_2-1):0] addr = we?addr_wr:addr_rd;
 
 Memory mem(
 	.data(data_wr),
-	.addr(addr_wr),
-	.addr(we),
+	.addr(addr),
+	.we(we),
     .clk(src_clk),
 	.q(data_rd)
 );
-// MEMORY WRITE
+
+wire tic_tac = wave_clk_en;
+/***************************************
+************ PHASE  ********************
+***************************************/
+
+always @(posedge src_clk) begin
+
+    //PULSE to set phase, must be in read mode
+    if(set_phase & !we)begin
+        //first time setup
+        fts = 1'b1;
+        // disable waveform output
+        wave_ena   = 1'b0; 
+        // transform degree to discrete index form [0,360]->[0,1024]
+        phase_indx = 2'd3*phase-phase/3'd6+phase/7'd90;
+
+        // Chosse the state where the phase is
+        if(phase_indx < 255) 
+		  begin 
+            state_sel  = S0;
+            phase_indx = 10'd0;
+		  end
+        else if (phase_indx >= 256 && phase_indx < 512) 
+        begin
+            state_sel = S1;
+            phase_indx = phase_indx-10'd256;
+        end
+        else if (phase_indx >= 512 && phase_indx < 768) 
+        begin
+            state_sel = S2;
+            phase_indx = phase_indx-10'd512;
+        end
+        else if (phase_indx >= 768 && phase_indx < 1024) 
+        begin
+            state_sel = S3;
+            phase_indx = phase_indx-10'd768;
+        end
+        else begin
+            state_sel = S0;
+            phase_indx = phase_indx-10'd0;
+        end
+    end
+    else if(!we)
+        // set_phase pulse is over and decrement phase_indx until zero
+        // once conter is 0 enable wave output.
+        if(tic_tac) //stay sync with memory manager
+        begin
+            fts = 1'b0;
+            if(phase_indx != 0)
+                phase_indx = phase_indx-1'b1;
+            else
+                wave_ena = 1'b1;
+        end
+end
+
+/***************************************
+************ MEMORY MANAGER*************
+***************************************/
 
 
-
-
-wire tic_tac = wave_ena?wave_clk_en:src_clk;
 reg [3:0] huffman;
 initial huffman = 4'b0000;
 
-//address movment depenind on the states
+//address movment depending on states outputs
+//when we are looking the phase the signal output is disable and the tic_tac is the same as clk
 always @(posedge src_clk) begin
-    if(tic_tac) begin
+
+    if(trigger  == 1'b1)
+    begin
+        trigger = 1'b0;
+    end
+
+    if(tic_tac & !we & !set_phase) 
+    begin
         if(huffman == 4'b0) 
         begin
-            if(memdir == FORWARD)
-            begin 
-                addr_rd = addr_rd +1'b1;
-                if(addr_rd > `MEMORY_HEIGHT) begin 
-                    trigger = 1'b1;
-                end
-            end
-            else if (memdir == BACKWARD) 
+            // dont reach a condition limit 
+            // diferent from first time setup
+            if(!trigger & !fts) 
             begin
-                if(addr_rd == 1'b0) 
-                begin
-                    trigger = 1'b1;
+                if(memdir == FORWARD)
+                begin 
+                    addr_rd = addr_rd +1'b1;
+                    if(addr_rd > (`MEMORY_HEIGHT-1)) begin 
+                        trigger = 1'b1;
+                    end
                 end
-                else begin
+                else if (memdir == BACKWARD) 
+                begin
                     addr_rd = addr_rd - 1'b1;
+                    if(addr_rd == 1'b0)
+                        trigger = 1'b1; // triger will be catch next cycle
                 end
             end
+            else begin
+                trigger  = 1'b0;
+                addr_rd  = read_dir;
+            end
+            // send signal to read memory
             read_mem = 1'b1;
         end
-        else
-            huffman = huffman-1'b0;
+        //decrement huffman
+        else begin 
             read_mem = 1'b0;
+            huffman  = huffman-1'b1;
+        end
     end
 end
-
-// MEMORY READ
-reg read_mem;
-initial read_mem = 1'b0;
+/***************************************
+************ MEMORY READ  **************
+***************************************/
 
 always @(posedge src_clk) begin
     if(read_mem)
-        huffman = data_rd&4'b1111;
-        if(data_pol == POL_POS)
-        begin
-            sinwave = 127+(data_rd>>4);
+        huffman = data_rd[3:0];
+        if(wave_ena) begin 
+            if(data_pol == POL_POS)
+            begin
+                sinwave = 7'h7F +(data_rd[10:4]); // 7F -> 127
+            end
+            else if(data_pol == POL_NEG) begin
+                sinwave = 7'h7F-(data_rd[10:4]);
+            end
         end
-        else if(data_pol == POL_NEG) begin
-            sinwave = 127-(data_rd>>4);
-        end
+        else
+            sinwave = 1'b0;
 end
+
     
 endmodule
