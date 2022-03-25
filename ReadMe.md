@@ -1,5 +1,5 @@
 
-# SIN WAVE COMPRESION FOR FPGA IMPLEMENTATION USING HUFFMAN CODING AND SVD
+# SIN WAVE FPGA IMPLEMENTATION USING HUFFMAN CODING AND SVD COMPRESSION
 
 This project implement a DDS **digital direct synthesis** in a CYCLONE V FPGA with Quartus enviorment.
 The advantage of this project is that it reduces memory footprint in RAM usage.
