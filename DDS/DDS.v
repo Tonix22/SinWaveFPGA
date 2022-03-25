@@ -102,7 +102,7 @@ always @(posedge src_clk) begin
         if(phase_indx < 255) 
 		  begin 
             state_sel  = S0;
-            phase_indx = 10'd0;
+            phase_indx = phase_indx-10'd0;
 		  end
         else if (phase_indx >= 256 && phase_indx < 512) 
         begin
