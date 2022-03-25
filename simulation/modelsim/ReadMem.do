@@ -51,7 +51,7 @@ add wave -position end sim:/MemoryRead_tb/dds_dut/read_mem
 
 add wave -radix unsigned -position end  sim:/MemoryRead_tb/dds_dut/mem/q
 
-add wave -position end sim:/MemoryRead_tb/dds_dut/sinwave
+add wave -radix unsigned -format analog-interpolated -min 0 -max 254 -height 84 -position end sim:/MemoryRead_tb/dds_dut/sinwave
 
 add wave -position end sim:/MemoryRead_tb/dds_dut/trigger
 

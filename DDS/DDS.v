@@ -4,6 +4,8 @@ module DDS(
     input src_clk,
     input set_phase,
     input [8:0] phase,
+    input set_freq,
+    input [31:0] freq,
     input [(`DATA_LEN-1):0] data_wr,
     input [(`ROWS_BASE_2-1):0] addr_wr,
     input we,
@@ -51,9 +53,13 @@ reg fts;
 ************ MODULES *****************
 ***************************************/
 
-Prescaler #(.DIV(`MHZ(10))) wave_clk 
+wire [31:0]freq_div = freq*32'd 1456;
+
+Prescaler #(.DIV(`MHZ(5))) wave_clk 
 (   .src_clk(src_clk),
     .en(en_clk),
+    .set_div(set_freq),
+    .div(freq_div),
     .clk_div(wave_clk_en)
 );
 
@@ -183,15 +189,13 @@ always @(posedge src_clk) begin
             huffman  = huffman-1'b1;
         end
     end
-end
-/***************************************
-************ MEMORY READ  **************
-***************************************/
-
-always @(posedge src_clk) begin
+    /***************************************
+    ************ MEMORY READ  **************
+    ***************************************/
     if(read_mem)
         huffman = data_rd[3:0];
-        if(wave_ena) begin 
+        if(wave_ena) 
+        begin 
             if(data_pol == POL_POS)
             begin
                 sinwave = 7'h7F +(data_rd[10:4]); // 7F -> 127
@@ -200,9 +204,8 @@ always @(posedge src_clk) begin
                 sinwave = 7'h7F-(data_rd[10:4]);
             end
         end
-        else
-            sinwave = 1'b0;
+    else
+        sinwave = 1'b0;
 end
 
-    
 endmodule

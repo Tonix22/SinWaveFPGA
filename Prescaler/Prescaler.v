@@ -2,13 +2,16 @@
 
 module Prescaler#(parameter SRC_CLK=`SOURCE_CLK,parameter DIV=`Output_frequency)(
     input src_clk,en,
+    input set_div,
+    input [31:0]div,
     output reg clk_div
 );
 
-localparam [31:0] MAX_CNT=`PRESCALE_CNT(SRC_CLK,DIV);
+reg [31:0] MAX_CNT;
 reg [31:0] cnt;
 initial cnt = 0;
 initial clk_div = 0;
+initial MAX_CNT = `PRESCALE_CNT(SRC_CLK,DIV);
 
 always @(posedge src_clk) begin
     if (en) begin
@@ -22,7 +25,10 @@ always @(posedge src_clk) begin
             clk_div = 0;
         end
     end
-    
+    if(set_div) begin
+        MAX_CNT=`PRESCALE_CNT(SRC_CLK,div);
+        cnt=0;
+    end
 end
     
 endmodule
